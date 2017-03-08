@@ -4,7 +4,7 @@ import argparse
 import os
 import json
 from TemplateHelper import TemplateHelper
-from biop3.Workspace.WorkspaceClient import Workspace
+#from biop3.Workspace.WorkspaceClient import Workspace
 
 desc1 = '''
 NAME
@@ -20,7 +20,7 @@ DESCRIPTION
 desc3 = '''
 EXAMPLES
       Build a Model Template object:
-      > Build_Model_Template.py compounds.tsv reactions.tsv
+      > Build_Model_Template.py GramNegative ../Templates/GramNegative /mmundy/public/modelsupport/templates/GramNegative.modeltemplate
       
 SEE ALSO
       Build_Biochem.py
@@ -35,13 +35,15 @@ if __name__ == "__main__":
     parser.add_argument('id', help='ID of Model Template object', action='store')
     parser.add_argument('templatedir', help='path to directory containing source files', action='store')
     parser.add_argument('ref', help='reference to workspace location to store Model Template object', action='store')
-    parser.add_argument('--biochemref', help='reference to Biochemistry object in workspace', action='store', default='')
+    parser.add_argument('--biochemref', help='reference to Biochemistry object in workspace', action='store', default='/chenry/public/modelsupport/biochemistry/default.biochem')
     parser.add_argument('--compoundfile', help='path to master compounds file', action='store', default='../Biochemistry/compounds.master.tsv')
     parser.add_argument('--reactionfile', help='path to master reactions file', action='store', default='../Biochemistry/reactions.master.tsv')
     parser.add_argument('--complexfile', help='path to master complexes file', action='store', default='../Templates/Complexes.tsv')
+    parser.add_argument('--rolefile', help='path to master roles file', action='store', default='../Templates/Roles.tsv')
     parser.add_argument('--name', help='name of object', action='store', default=None)
     parser.add_argument('--type', help='type of model', action='store', default='GenomeScale')
     parser.add_argument('--domain', help='domain of organisms', action='store', default='Bacteria')
+    parser.add_argument('--show-stats', help='show statistics about Model Template', action='store_true', dest='showStats', default=False)
     parser.add_argument('--wsurl', help='URL of workspace server', action='store', dest='wsurl', default='http://p3.theseed.org/services/Workspace')
     usage = parser.format_usage()
     parser.description = desc1 + '      ' + usage + desc2
@@ -58,14 +60,10 @@ if __name__ == "__main__":
         template['name'] = args.name
     else:
         template['name'] = args.id
-    template['modelType'] = args.type
+    template['type'] = args.type
     template['domain'] = args.domain
     template['biochemistry_ref'] = args.biochemref
     template['pathways'] = list() # Always an empty for now
-
-    # Need to support these fields
-    template['roles'] = list()
-    template['complexes'] = list()
 
     # Order is important so references can be made between sections of the Model Template.
     
@@ -81,13 +79,11 @@ if __name__ == "__main__":
     template['biomasses'] = [ helper.biomasses[key] for key in helper.biomasses ]
 
     # Add the template roles.
-    rolesFile = os.path.join(args.templatedir, '..', 'Roles.tsv')
-    helper.readRolesFile(rolesFile, includeLinenum=False)
+    helper.readRolesFile(args.rolefile, includeLinenum=False)
     template['roles'] = [ helper.roles[key] for key in helper.roles ]
 
     # Add the template complexes.
-    complexesFile = os.path.join(args.templatedir, '..', 'Complexes.tsv')
-    helper.readComplexesFile(complexesFile, includeLinenum=False)
+    helper.readComplexesFile(args.complexfile, includeLinenum=False)
     template['complexes'] = [ helper.complexes[key] for key in helper.complexes ]
 
     # Add the template reactions.
@@ -103,10 +99,26 @@ if __name__ == "__main__":
 
     # Save a local copy for easy reference.
     filename = os.path.join(args.templatedir, args.id+'.json')
+    print filename
     json.dump(template, open(filename, 'w'), indent=4)
     
     # Save the Model Template typed object to the specified workspace path. An existing typed object
     # is overwritten with the updated data.
-    wsClient = Workspace(args.wsurl)
-    output = wsClient.create( { 'objects': [ [ args.ref, 'modeltemplate', {}, template ] ], 'overwrite': 1 });
+    #wsClient = Workspace(args.wsurl)
+    #output = wsClient.create( { 'objects': [ [ args.ref, 'modeltemplate', {}, template ] ], 'overwrite': 1 });
+    
+    # Print statistics about the Model Template if requested.
+    if args.showStats:
+        print 'Number of compartments: '+str(len(template['compartments']))
+        print 'Number of biomasses: '+str(len(template['biomasses']))
+        print 'Number of roles: '+str(len(template['roles']))
+        print 'Number of complexes: '+str(len(template['complexes']))
+        print 'Number of reactions: '+str(len(template['reactions']))
+        print '  Number of conditional reactions: '+str(helper.numConditional)
+        print '  Number of gapfilling reactions: '+str(helper.numGapfilling)
+        print '  Number of spontaneous reactions: '+str(helper.numSpontaneous)
+        print '  Number of universal reactions: '+str(helper.numUniversal)
+        print 'Number of compounds: '+str(len(template['compounds']))
+        print 'Number of compcompounds: '+str(len(template['compcompounds']))
+        
     exit(0)
